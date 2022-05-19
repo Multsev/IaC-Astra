@@ -1,0 +1,30 @@
+---
+# IPA Server
+ipaadmin_password: "ipaadmin_password"
+ipadm_password: "ipadm_password"
+ipaserver_domain: test.local
+ipaserver_realm: "{{ ipaserver_domain|upper }}"
+ipaserver_install_packages: true
+ipaserver_setup_firewalld: true
+ipaserver_setup_dns: true
+ipaserver_auto_forwarders: true
+# ipaserver_forwarders:
+#   - "8.8.4.4"
+
+# IPA Client
+ipaservers:
+  - "{{ hostvars['machine-1']['ansible_fqdn'] }}"
+ipaclient_servers: "{{ hostvars['machine-1']['ansible_fqdn'] }}"
+ipaclient_domain: "{{ ipaserver_domain }}"
+ipaclient_realm: "{{ ipaserver_realm }}"
+ipaclient_mkhomedir: true
+ipaadmin_principal: admin
+ipaclient_force_join: yes
+ipaclient_all_ip_addresses: true
+ipaclient_ntp_servers:
+  - "{{ hostvars['machine-1']['ansible_eth1']['ipv4']['address'] }}"
+  - "ntp5.stratum2.ru"
+ipasssd_permit: true
+ipasssd_enable_dns_updates: true
+ipasssd_no_krb5_offline_passwords: false
+ipaclient_no_dns_lookup: yes

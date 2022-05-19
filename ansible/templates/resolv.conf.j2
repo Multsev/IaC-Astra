@@ -1,0 +1,6 @@
+# {{ ansible_managed }}
+
+search {{ ansible_domain }}
+domain {{ ansible_domain }}
+
+nameserver {{ hostvars['machine-1']['ansible_eth1']['ipv4']['address'] }}

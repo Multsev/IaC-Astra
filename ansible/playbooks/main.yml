@@ -1,0 +1,153 @@
+---
+- hosts: all
+  become: true
+  vars_files:
+    - ../vars/main.yml
+    - ../vars/zabbix-agent.yml
+  # roles:
+  #   - community.zabbix.zabbix_agent
+  tasks:
+  - name: Set timezone
+    community.general.timezone:
+      name: "{{ ntp_timezone }}"
+  - name: Disable SELinux
+    ansible.posix.selinux:
+      state: disabled
+  - name: Enable IPv6
+    shell: echo "net.ipv6.conf.all.disable_ipv6 = 0" > /etc/sysctl.conf && sysctl -p
+  - name: Set FQDN hostname
+    ansible.builtin.hostname:
+      name: "{{ ansible_fqdn }}"
+  - name: Generate /etc/hosts file
+    template:
+      src=../templates/hosts.j2
+      dest=/etc/hosts
+
+- hosts: machine-1
+  become: true
+  vars_files:
+    - ../vars/ipa.yml
+  roles:
+    - freeipa.ansible_freeipa.ipaserver
+  tasks:
+    - name: Create user 'user1'
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: user1
+        first: First
+        last: Person
+        uid: 10001
+        phone: "+70000000001"
+        email: user1@local.com
+        password: "user1"
+        update_password: on_create
+    - name: Create user 'user2'
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: user2
+        first: Second
+        last: Person
+        uid: 10002
+        phone: "+70000000002"
+        email: user2@local.com
+        password: "user2"
+        update_password: on_create
+    - name: Create group sysops
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: sysops
+        user:
+          - user1
+          - user2
+
+- hosts: machine-2 machine-3
+  become: true
+  vars_files:
+    - ../vars/ipa.yml
+  roles:
+    - freeipa.ansible_freeipa.ipaclient
+  pre_tasks:
+  - name: Generate resolv.conf file
+    template:
+      src=../templates/resolv.conf.j2
+      dest=/etc/resolv.conf
+
+- hosts: machine-2
+  vars_files:
+    - ../vars/foreman.yml
+  roles:
+    - role: riponbanik.foreman
+      foreman_hostname: "{{ ansible_fqdn }}"
+      foreman_version: 1.19  
+      foreman_plugins:
+        - ansible
+        - remote-execution
+
+- hosts: machine-3
+  gather_facts: true
+  vars:
+    docker_build_dir: /dockerbuild/zabbix
+  pre_tasks:
+  - name: Add Docker repo
+    ansible.builtin.get_url:
+      url: https://download.docker.com/linux/centos/docker-ce.repo
+      dest: /etc/yum.repos.d/docker-ce.repo
+    become: true
+  - name: Install Docker
+    ansible.builtin.package:
+      name: docker-ce
+      state: latest
+    become: true
+  - name: Start Docker service
+    ansible.builtin.service:
+      name: docker
+      state: started
+      enabled: yes
+    become: true
+  - name: Install python docker module
+    vars:
+      ansible_python_interpreter: /usr/bin/python3
+    ansible.builtin.pip:
+      name: docker
+  - name: Add user vagrant to docker group
+    ansible.builtin.user:
+      name: vagrant
+      groups: docker
+      append: yes
+    become: true
+  tasks:
+    - name: Create directory for docker build
+      ansible.builtin.file:
+        path: "{{ docker_build_dir }}"
+        state: directory
+    - name: Copy Zabbix docker container source
+      ansible.builtin.copy:
+        src: ../../docker/zabbix/
+        dest: "{{ docker_build_dir }}"
+        owner: root
+        group: root
+        mode: '0644'
+        force: yes
+    - name: Build Zabbix image
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+      community.docker.docker_image:
+        name: zabbix-all-in-one:v1.0
+        build:
+          path: "{{ docker_build_dir }}"
+        source: build
+        state: present
+    - name: Deploy Zabbix
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+      community.docker.docker_container:
+        name: zabbix-all-in-one
+        image: zabbix-all-in-one:v1.0
+        ports:
+          - "80:80"
+          - "10050:10050"
+          - "10051:10051"
+          - "5432:5432"
+        volumes:
+          - zabbix-pgdata
+        restart_policy: always

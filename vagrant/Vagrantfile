@@ -1,0 +1,40 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = "solutionreach/centos7-gcp"
+  # config.vm.box_url = file://boxes/solutionreach-centos7-gcp.v1.6.1.32.box
+
+  config.ssh.insert_key = true
+
+  config.vm.provider :virtualbox do |v|
+    v.memory = 2048
+    v.cpus = 1
+  end
+
+  Domain="test.local"
+  N=3
+  (1..N).each do |i|
+    config.vm.define "machine-#{i}" do |machine|
+      machine.vm.hostname = "machine-#{i}.#{Domain}"
+      machine.vm.post_up_message = "Setup machine-#{i} is sucssess!"
+      machine.vm.network "public_network", ip: "192.168.99.21#{i}",
+        use_dhcp_assigned_default_route: true
+      machine.vm.network "forwarded_port", guest: 80, host: "808#{i-1}", protocol: "tcp"
+  
+      machine.vm.provision :ansible do |ansible|
+        ansible.playbook = "ansible/playbooks/main.yml"
+        ansible.limit = "all"
+        ansible.compatibility_mode = "2.0"
+        ansible.verbose = "v"
+        ansible.become = true
+        ansible.groups = {
+          "ipaserver" => ["machine-1"],
+          "ipaclients"  => ["machine-2","machine-3"]
+        }
+      end
+    end
+  end
+end

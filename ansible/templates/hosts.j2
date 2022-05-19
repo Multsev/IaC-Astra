@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+{% set ipv4 = ansible_eth1.ipv4.address %}
+{% set fqdn = ansible_fqdn %}
+{% set hostname = ansible_facts.hostname %}
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+
+{{ ipv4 }} {{ fqdn }} {{ hostname }}
+{% for host in groups['ipaclients'] %}
+{% if hostname == host %}
+{{ hostvars['machine-1']['ansible_eth1']['ipv4']['address'] }} {{ hostvars['machine-1']['ansible_fqdn'] }} {{ hostvars['machine-1']['ansible_hostname'] }}
+{% endif %}
+{% endfor %}

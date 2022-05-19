@@ -1,0 +1,19 @@
+---
+roles:
+  - name: geerlingguy.docker
+    version: 4.2.2
+  - name: riponbanik.foreman
+
+collections:
+  - name: community.general
+    version: 4.8.0
+  - name: freeipa.ansible_freeipa
+    version: 1.7.0
+  - name: theforeman.foreman
+    version: 3.3.0
+  - name: community.docker
+    version: 2.4.0
+  - name: community.zabbix
+    version: 1.6.0
+  - name: ansible.posix
+    version: 1.3.0
